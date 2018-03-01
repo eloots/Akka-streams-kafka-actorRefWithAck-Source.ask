@@ -51,10 +51,10 @@ object AtLeastOnceExample extends ConsumerExample {
       val orderProcessor = system.actorOf(OrderProcessor.props, s"order-processor-$processorId")
 
       Consumer.committableSource(consumerSettings, Subscriptions.topics("grouptopic"))
-        .mapAsync(1) { msg =>
-          //              system.log.info(s"committableSource ~~~> Received message: ${msg.record.value()} with offset = ${msg.committableOffset.partitionOffset.offset}")
-          Future.successful(msg)
-        }
+//        .mapAsync(1) { msg =>
+//          //              system.log.info(s"committableSource ~~~> Received message: ${msg.record.value()} with offset = ${msg.committableOffset.partitionOffset.offset}")
+//          Future.successful(msg)
+//        }
         .runWith(Sink.actorRefWithAck(orderProcessor, OrderProcessor.Init, OrderProcessor.Ack, OrderProcessor.Done))
     }
 
