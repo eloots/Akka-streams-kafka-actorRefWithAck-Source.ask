@@ -43,18 +43,22 @@ object AtLeastOnceExample extends ConsumerExample {
 
     system.log.info("~~~> Started application")
 
-    val orderProcessor = system.actorOf(OrderProcessor.props, "order-processor")
+    val NProcessors = 4
 
-    val done =
+    for {
+      processorId <- 1 to NProcessors
+    } {
+      val orderProcessor = system.actorOf(OrderProcessor.props, s"order-processor-$processorId")
+
       Consumer.committableSource(consumerSettings, Subscriptions.topics("grouptopic"))
         .mapAsync(1) { msg =>
-//              system.log.info(s"committableSource ~~~> Received message: ${msg.record.value()} with offset = ${msg.committableOffset.partitionOffset.offset}")
+          //              system.log.info(s"committableSource ~~~> Received message: ${msg.record.value()} with offset = ${msg.committableOffset.partitionOffset.offset}")
           Future.successful(msg)
         }
         .runWith(Sink.actorRefWithAck(orderProcessor, OrderProcessor.Init, OrderProcessor.Ack, OrderProcessor.Done))
+    }
 
     system.log.info("~~~> Scheduled work...")
-
   }
 }
 

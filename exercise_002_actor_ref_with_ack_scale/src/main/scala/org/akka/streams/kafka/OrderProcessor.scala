@@ -23,6 +23,8 @@ class OrderProcessor extends Actor with ActorLogging with Stash with Timers {
 
   override def receive: Receive = idle
 
+  private val myName = self.path.name
+
   def idle: Receive = {
     case Init =>
       log.info("~~~> OrderProcessor: Received Init")
@@ -34,7 +36,7 @@ class OrderProcessor extends Actor with ActorLogging with Stash with Timers {
       log.info(s"~~~> OrderProcessor: no more elements - end of stream")
 
     case msg: CommittableMessage[ConsumerRecord[Array[Byte], String], CommittableOffset] =>
-      log.info(s"~~~> OrderProcessor starts processing message: ${msg.record.value}")
+      log.info(s"~~~> $myName starts processing message: ${msg.record.value}")
       timers.startSingleTimer("process-timer", TimerDone, 1.seconds)
       context.become(busy(msg, sender))
 
@@ -42,7 +44,7 @@ class OrderProcessor extends Actor with ActorLogging with Stash with Timers {
 
   def busy(msg: CommittableMessage[ConsumerRecord[Array[Byte], String], CommittableOffset], sndr: ActorRef): Receive = {
     case TimerDone =>
-      log.info(s"~~~> OrderProcessor ended processing message: ${msg.record.value.toString}")
+      log.info(s"~~~> $myName ended processing message: ${msg.record.value.toString}")
       context.become(idle)
       sndr ! Ack
       msg.committableOffset.commitScaladsl()
