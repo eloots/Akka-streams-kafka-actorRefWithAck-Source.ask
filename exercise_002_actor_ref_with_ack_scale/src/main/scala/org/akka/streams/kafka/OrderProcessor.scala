@@ -25,6 +25,11 @@ class OrderProcessor extends Actor with ActorLogging with Stash with Timers {
 
   private val myName = self.path.name
 
+  import scala.util.Random
+
+  // Set seed to obtain processing delays of messages that are the same across different runs
+  Random.setSeed(12345L)
+
   def idle: Receive = {
     case Init =>
       log.info("~~~> OrderProcessor: Received Init")
@@ -36,8 +41,10 @@ class OrderProcessor extends Actor with ActorLogging with Stash with Timers {
       log.info(s"~~~> OrderProcessor: no more elements - end of stream")
 
     case msg: CommittableMessage[ConsumerRecord[Array[Byte], String], CommittableOffset] =>
-      log.info(s"~~~> $myName starts processing message: ${msg.record.value}")
-      timers.startSingleTimer("process-timer", TimerDone, 1.seconds)
+
+      val randomDelaySeconds = Random.nextInt(4)
+      log.info(s"~~~> $myName starts processing message: ${msg.record.value} with processing time = ${1 + randomDelaySeconds} seconds")
+      timers.startSingleTimer("process-timer", TimerDone, (1 + randomDelaySeconds).seconds)
       context.become(busy(msg, sender))
 
   }
