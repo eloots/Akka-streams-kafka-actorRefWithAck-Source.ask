@@ -1,4 +1,4 @@
-base_kafka_consumer_actorRef_with_Ack
+base_kafka_consumer_map_async
 
 # Using Akka Streams Kafka to build a Kafka consumer
 

@@ -20,43 +20,48 @@
 
 package org.akka.streams.kafka
 
-import java.util.concurrent.atomic.AtomicLong
-
-import akka.{Done, NotUsed}
-import akka.actor.ActorSystem
+import akka.Done
+import akka.actor.{ActorSystem, Scheduler}
+import akka.kafka.ConsumerMessage.CommittableMessage
 import akka.kafka._
 import akka.kafka.scaladsl.Consumer
+import akka.pattern.after
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink}
-import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecord}
+import akka.stream.scaladsl.Sink
+import org.akka.streams.kafka.AtLeastOnceExample.system
+import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, StringDeserializer}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
-import akka.pattern.after
-import akka.util.Timeout
-
 import scala.util.{Failure, Success}
+
+object HeavyLifting {
+
+  def doSomeHeavyLifting(msg: CommittableMessage[Array[Byte], String])(implicit scheduler: Scheduler, ec: ExecutionContext): Future[CommittableMessage[Array[Byte], String]] = {
+    system.log.info(s"~~~> OrderProcessor starts processing message: ${msg.record.value}")
+
+    after(1.second, scheduler){
+      system.log.info(s"~~~> OrderProcessor ended processing message: ${msg.record.value.toString}")
+      Future.successful(msg)
+    }
+  }
+}
 
 object AtLeastOnceExample extends ConsumerExample {
   def main(args: Array[String]): Unit = {
 
     implicit val m = ActorMaterializer.create(system)
+    implicit val s: Scheduler = system.scheduler
 
     implicit val ec = system.dispatcher
-    implicit val askTimeout: Timeout = 5000.seconds
 
         system.log.info("~~~> Started application")
 
         val done =
           Consumer.committableSource(consumerSettings, Subscriptions.topics("grouptopic"))
             .mapAsync(4) { msg =>
-              system.log.info(s"~~~> OrderProcessor starts processing message: ${msg.record.value}")
-              after(1.second, system.scheduler){
-                system.log.info(s"~~~> OrderProcessor ended processing message: ${msg.record.value.toString}")
-                Future.successful(msg)
-              }
-
+              HeavyLifting.doSomeHeavyLifting(msg)
             }
             .mapAsync(1) { msg =>
               msg.committableOffset.commitScaladsl()
