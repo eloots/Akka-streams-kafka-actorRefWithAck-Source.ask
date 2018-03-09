@@ -56,19 +56,19 @@ object AtLeastOnceExample extends ConsumerExample {
 
     implicit val ec = system.dispatcher
 
-        system.log.info("~~~> Started application")
+    system.log.info("~~~> Started application")
 
-        val done =
-          Consumer.committableSource(consumerSettings, Subscriptions.topics("grouptopic"))
-            .mapAsync(4) { msg =>
-              HeavyLifting.doSomeHeavyLifting(msg)
-            }
-            .mapAsync(1) { msg =>
-              msg.committableOffset.commitScaladsl()
-            }
-            .runWith(Sink.ignore)
+    val done =
+      Consumer.committableSource(consumerSettings, Subscriptions.topics("grouptopic"))
+        .mapAsync(4) { msg =>
+          HeavyLifting.doSomeHeavyLifting(msg)
+        }
+        .mapAsync(1) { msg =>
+          msg.committableOffset.commitScaladsl()
+        }
+        .runWith(Sink.ignore)
 
-        terminateWhenDone(done)
+    terminateWhenDone(done)
 
     terminateWhenDone(done)
   }
@@ -78,10 +78,16 @@ trait ConsumerExample {
   val system = ActorSystem("example")
   implicit val ec = system.dispatcher
 
+  private val config = system.settings.config
+
+  private val bootstrapServers = config.getString("akka-streams-kafka.bootstrap-servers")
+
+  system.log.info(s"Starting with bootstrap servers: $bootstrapServers")
+
   // #settings
   val consumerSettings: ConsumerSettings[Array[Byte], String] =
     ConsumerSettings(system, new ByteArrayDeserializer, new StringDeserializer)
-      .withBootstrapServers("192.168.0.9:32780,192.168.0.9:32779,192.168.0.9:32778")
+      .withBootstrapServers(bootstrapServers)
       .withGroupId("cg1")
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
 

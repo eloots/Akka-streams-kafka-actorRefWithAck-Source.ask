@@ -20,19 +20,18 @@
 
 package org.akka.streams.kafka
 
-import java.util.concurrent.atomic.AtomicLong
-
-import akka.{Done, NotUsed}
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Props}
+import akka.kafka.ConsumerMessage.{CommittableMessage, CommittableOffset, CommittableOffsetBatch}
 import akka.kafka._
 import akka.kafka.scaladsl.Consumer
+import akka.routing.FromConfig
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink}
+import akka.stream.scaladsl.Sink
+import akka.util.Timeout
 import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecord}
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, StringDeserializer}
 
-import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import scala.concurrent.duration._
 
 object AtLeastOnceExample extends ConsumerExample {
   def main(args: Array[String]): Unit = {
@@ -41,17 +40,19 @@ object AtLeastOnceExample extends ConsumerExample {
 
     implicit val ec = system.dispatcher
 
+    implicit val askTimeout: Timeout = 10.seconds
+
     system.log.info("~~~> Started application")
 
-    val orderProcessor = system.actorOf(OrderProcessor.props, "order-processor")
+    val orderProcessor = system.actorOf(FromConfig.props(OrderProcessor.props), "order-processor")
 
     val done =
       Consumer.committableSource(consumerSettings, Subscriptions.topics("grouptopic"))
-        .mapAsync(1) { msg =>
-//              system.log.info(s"committableSource ~~~> Received message: ${msg.record.value()} with offset = ${msg.committableOffset.partitionOffset.offset}")
-          Future.successful(msg)
-        }
-        .runWith(Sink.actorRefWithAck(orderProcessor, OrderProcessor.Init, OrderProcessor.Ack, OrderProcessor.Done))
+        .ask[CommittableMessage[ConsumerRecord[Array[Byte], String], CommittableOffset]](parallelism = 4)(orderProcessor)
+        .groupedWithin(10, 5.seconds)
+        .map(group => group.foldLeft(CommittableOffsetBatch.empty) { (batch, elem) => batch.updated(elem.committableOffset) })
+        .mapAsync(3)(_.commitScaladsl())
+        .runWith(Sink.ignore)
 
     system.log.info("~~~> Scheduled work...")
 
@@ -71,7 +72,7 @@ trait ConsumerExample {
   // #settings
   val consumerSettings: ConsumerSettings[Array[Byte], String] =
     ConsumerSettings(system, new ByteArrayDeserializer, new StringDeserializer)
-      .withBootstrapServers(bootstrapServers)
+      .withBootstrapServers("192.168.0.55:32771,192.168.0.55:32770,192.168.0.55:32769")
       .withGroupId("cg1")
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
 

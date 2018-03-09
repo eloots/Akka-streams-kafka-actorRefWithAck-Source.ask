@@ -5,7 +5,8 @@ lazy val AkkaStreamsKafka_master = (project in file("."))
     exercise_000_initial_state,
     exercise_001_actor_ref_with_ack,
     exercise_002_actor_ref_with_ack_scale,
-    exercise_003_map_async
+    exercise_003_actor_with_ask,
+    exercise_004_map_async
  ).settings(CommonSettings.commonSettings: _*)
 
 lazy val common = project.settings(CommonSettings.commonSettings: _*)
@@ -22,7 +23,11 @@ lazy val exercise_002_actor_ref_with_ack_scale = project
   .settings(CommonSettings.commonSettings: _*)
   .dependsOn(common % "test->test;compile->compile")
 
-lazy val exercise_003_map_async = project
+lazy val exercise_003_actor_with_ask = project
+  .settings(CommonSettings.commonSettings: _*)
+  .dependsOn(common % "test->test;compile->compile")
+
+lazy val exercise_004_map_async = project
   .settings(CommonSettings.commonSettings: _*)
   .dependsOn(common % "test->test;compile->compile")
        
